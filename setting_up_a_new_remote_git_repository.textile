@@ -1,0 +1,227 @@
+(a gist based on the old toolmantim article on setting up remote repos)
+
+To collaborate in a distributed development process you'll need to push code to remotely accessible repositories.
+
+This is somewhat of a follow-up to the previous article "setting up a new rails app with git":http://toolmantim.com/article/2007/12/5/setting_up_a_new_rails_app_with_git.
+
+h2. For the impatient
+
+Set up the new bare repo on the server:
+
+<pre><code class="shell">$ ssh myserver.com
+Welcome to myserver.com!
+$ mkdir /var/git/myapp.git && cd /var/git/myapp.git
+$ git --bare init
+Initialized empty Git repository in /var/git/myapp.git
+$ exit
+Bye!
+</code></pre>
+
+Add the remote repository to your existing local git repo and push:
+
+<pre><code class="shell">$ cd ~/Sites/myapp
+$ git remote add origin user@myserver.com:/var/git/myapp.git
+$ git push origin master</code></pre>
+
+Set the local master branch to track the remote branch.
+
+Read further for a step-by-step explanation of what's going on.
+
+h2. Pre-flight sanity check
+
+Setting up a remote repository is fairly simple but somewhat confusing at first. Firstly, let's check out what remote repositories are being tracked in our git repo:
+
+<pre><code class="shell">$ cd ~/Sites/myapp
+$ git remote</code></pre>
+
+None. Looking good. Now let's list all the branches:
+
+<pre><code class="shell">$ git branch -a
+* master
+</code></pre>
+
+Just one branch, the master branch. Let's have a look at @.git/config@:
+
+<pre><code class="shell">$ cat .git/config
+[core]
+        repositoryformatversion = 0
+        filemode = true
+        bare = false
+        logallrefupdates = true</code></pre>
+
+A pretty bare-minimum config file.
+
+h2. Creating the bare remote repository
+
+Before we can push our local master branch to a remote repository we need to create the remote repository. To do this we'll ssh in and create it on the server:
+
+<pre><code class="shell">
+$ ssh myserver.com
+Welcome to myserver.com!
+$ cd /var/git
+$ mkdir myapp.git
+$ cd myapp.git
+$ git --bare init
+Initialized empty Git repository in /var/git/myapp.git
+$ exit
+Bye!
+</code></pre>
+
+A short aside about what git means by <em>bare</em>: A default git repository assumes that you'll be using it as your working directory, so git stores the actual bare repository files in a @.git@ directory alongside all the project files. Remote repositories don't need copies of the files on the filesystem unlike working copies, all they need are the deltas and binary what-nots of the repository itself. This is what "bare" means to git. Just the repository itself.
+
+h2. Adding the remote repository to our local git repository configuration
+
+Now that we've created the remote repository we'll add it to our local repository as a remote server called "origin" using @git remote add@, which is just a nicer way of updating our config file for us:
+
+<pre><code class="shell">
+$ git remote add origin user@myserver.com:/var/git/myapp.git</code></pre>
+
+Let's see what it added to the config file:
+
+<pre><code>[core]
+  repositoryformatversion = 0
+  filemode = true
+  bare = false
+  logallrefupdates = true
+[remote "origin"]
+  url = user@myserver.com:/var/git/myapp.git
+  fetch = +refs/heads/*:refs/remotes/origin/*</code></pre>
+
+We now have a remote repository "origin" that will fetch all of its @refs/heads/*@ branches and store them in our local repo in @refs/remotes/origin/*@ when a @git fetch@ is performed.
+
+h2. Pushing to the remote repository
+
+The time has come to push our local master branch to the origin's master branch. We do that using the @git push <target> <local>@ command.
+
+<pre><code class="shell">
+$ git push origin master
+updating 'refs/heads/master'
+  from 0000000000000000000000000000000000000000
+  to   b379203bc187c2926f44a71eca3f901321ea42c6
+ Also local refs/remotes/origin/master
+Generating pack...
+Done counting 1374 objects.
+Deltifying 1374 objects...
+ 100% (1374/1374) done
+Writing 1374 objects...
+ 100% (1374/1374) done
+Total 1374 (delta 89), reused 0 (delta 0)
+refs/heads/master: 0000000000000000000000000000000000000000 -> b379203bc187c2926f44a71eca3f901321ea42c6
+</code></pre>
+
+and that's all, folks. Further pushes can be done by repeating the @git push@ command.
+
+Now you can tell your co-conspirators to:
+
+<pre><code class="shell">$ git clone user@myserver.com:/var/git/myapp.git</code></pre>
+
+and push and pull to your heart's content.
+
+h2. Track the remote branch
+
+You can specify the default remote repository for pushing and pulling using git-branch's track option. You'd normally do this by specifying the @--track@ option when creating your local master branch, but as it already exists we'll just update the config manually like so:
+
+<pre><code>[branch "master"]
+  remote = origin
+  merge = refs/heads/master
+</code></pre>
+
+Now you can simply @git push@ and @git pull@.
+
+h2. Sharing the remote repository with the world
+
+If you want to set it up as a public repository be sure to check out the Git manual's chapter on "public git repositories":http://www.kernel.org/pub/software/scm/git/docs/user-manual.html#public-repositories.
+
+h2. Working with remote repository branches
+
+@git remote show@ is used to inspect a remote repository. It goes and checks the remote repository to see what branches have been added and removed since the last @git fetch@.
+
+Doing a @git remote show@ at the moment only shows us the remote repo's master branch which we pushed earlier:
+
+<pre><code class="shell">$ git remote show origin
+* remote origin
+  URL: user@myserver.com:/var/git/myapp.git
+  Tracked remote branches
+    master</code></pre>
+
+Let's create a new local git repository and push to a new branch on the remote repository. We can then use @git remote show@ to see the new remote branch, @git fetch@ to mirror it into our local repo and @git checkout --track -b@ to create a local branch to do some work on it.
+
+We'll start by creating a new local repo and pushing some code to a new branch in the remote repository.
+
+<pre><code class="shell">$ mkdir /tmp/other-git
+$ cd /tmp/other-git
+$ git init
+Initialized empty Git repository in /tmp/other-git
+$ git remote add origin user@myserver.com:/var/git/myapp.git
+$ echo "Rails 2... woo" > afile
+$ git add afile
+$ git commit -m "Added afile"
+Created initial commit 0ac9a74: Added afile
+ 1 files changed, 1 insertions(+), 0 deletions(-)
+ create mode 100644 something
+$ git push origin master:rails-2
+updating 'refs/heads/rails-2' using 'refs/heads/master'
+  from 0000000000000000000000000000000000000000
+  to   0ac9a7457f4b21c9e058d4c54d262584bf35e528
+ Also local refs/remotes/origin/rails-2
+Generating pack...
+Done counting 3 objects.
+Deltifying 3 objects...
+ 100% (3/3) done
+Writing 3 objects...
+ 100% (3/3) done
+Total 3 (delta 0), reused 0 (delta 0)
+Unpacking 3 objects...
+ 100% (3/3) done
+refs/heads/rails-2: 0000000000000000000000000000000000000000 -> 0ac9a7457f4b21c9e058d4c54d262584bf35e528
+</code></pre>
+
+Now let's switch back to our old git repository and see if it detects the new branch on the remote repository:
+
+<pre><code class="shell">$ git remote show origin
+* remote origin
+  URL: user@myserver.com:/var/git/myapp.git
+  New remote branches (next fetch will store in remotes/origin)
+    rails-2
+  Tracked remote branches
+    master
+</code></pre>
+
+Let's update our mirror of the remote repository by doing a @git fetch@:
+
+<pre><code class="shell">$ git fetch
+* refs/remotes/origin/master: storing branch 'rails-2' of user@myserver.com:/var/git/myapp.git
+  commit: b379203
+$ git remote show origin
+* remote origin
+  URL: user@myserver.com:/var/git/myapp.git
+  Tracked remote branches
+    master
+    rails-2</code></pre>
+
+We should now be able to see this in a our list of remote branches:
+
+<pre><code class="shell">$ git branch -a
+* master
+origin/rails-2
+origin/master</code></pre>
+
+If we then wanted to do some work on this remote @rails-2@ branch we create a new local tracking branch like so:
+
+<pre><code class="shell">$ git checkout --track -b rails-2 origin/rails-2
+Branch rails-2 set up to track remote branch refs/remotes/origin/rails-2.
+Switched to a new branch "rails-2"
+</code></pre>
+
+To keep up-to-date and push new changesets we simply use @git push@ and @git pull@ when working in the local @rails-2@ branch.
+
+Also notice, like we manually changed for master, @.git/config@ has a new entry for this new tracking branch:
+
+<pre><code>[branch "rails-2"]
+  remote = origin
+  merge = refs/heads/rails-2
+</code></pre>
+
+h2. Further Reading
+
+"Sourcemage's Git Guide":http://wiki.sourcemage.org/Git_Guide has some very very handy real-life examples of git commands you'll often need.
