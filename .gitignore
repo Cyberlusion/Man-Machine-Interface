@@ -1,0 +1,55 @@
+# Build artifacts
+build/
+*.o
+*.a
+*.so
+*.elf
+*.bin
+*.hex
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Security sensitive
+security/keys/production/
+*.key
+*.pem
+*.p12
+*.pfx
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+venv/
+.pytest_cache/
+
+# Documentation
+docs/_build/
+*.pdf
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.bak
+*.log
+
+# Core dumps
+core
+*.core
+
+# Formal verification
+*.vo
+*.glob
+*.v.d
+.coq-native/
